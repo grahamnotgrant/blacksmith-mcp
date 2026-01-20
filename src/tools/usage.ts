@@ -81,41 +81,39 @@ export async function getCacheStats(
   client: BlacksmithClient,
   args: { include_history?: boolean }
 ) {
-  const stats = await client.getCacheStats(args.include_history ?? false);
+  // API returns array of repository cache summaries
+  const repos = await client.getCacheStats(args.include_history ?? false);
 
-  // Convert bytes to human-readable
-  const formatBytes = (bytes: number): string => {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-    return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+  // Calculate totals from repository data
+  const totalGb = repos.reduce((sum, r) => sum + r.usage_total_gbs, 0);
+  const totalEntries = repos.reduce((sum, r) => sum + r.num_entries, 0);
+
+  const formatSize = (gb: number): string => {
+    if (gb < 0.001) return `${(gb * 1024 * 1024).toFixed(0)} KB`;
+    if (gb < 1) return `${(gb * 1024).toFixed(1)} MB`;
+    return `${gb.toFixed(2)} GB`;
   };
-
-  const repositories = stats.repositories ?? [];
 
   return {
     summary: {
-      total_size: formatBytes(stats.total_size_bytes ?? 0),
-      total_size_bytes: stats.total_size_bytes ?? 0,
-      total_entries: stats.total_entries ?? 0,
-      hit_rate_percent: Math.round((stats.hit_rate ?? 0) * 100),
+      total_size: formatSize(totalGb),
+      total_size_gb: totalGb,
+      total_entries: totalEntries,
+      repository_count: repos.length,
     },
-    repositories: repositories
-      .sort((a, b) => b.size_bytes - a.size_bytes)
+    repositories: repos
+      .sort((a, b) => b.usage_total_gbs - a.usage_total_gbs)
       .slice(0, 10)
       .map(repo => ({
         name: repo.name,
-        size: formatBytes(repo.size_bytes),
-        size_bytes: repo.size_bytes,
-        entries: repo.entries,
+        size: formatSize(repo.usage_total_gbs),
+        size_gb: repo.usage_total_gbs,
+        entries: repo.num_entries,
+        usage_percent: repo.usage_total_percentage,
       })),
-    insight: (stats.hit_rate ?? 0) >= 0.8
-      ? `Cache hit rate is excellent (${Math.round((stats.hit_rate ?? 0) * 100)}%).`
-      : (stats.hit_rate ?? 0) >= 0.5
-        ? `Cache hit rate is moderate (${Math.round((stats.hit_rate ?? 0) * 100)}%). Consider optimizing cache keys.`
-        : repositories.length === 0
-          ? 'No cache data found. Cache may not be configured or no entries exist yet.'
-          : `Cache hit rate is low (${Math.round((stats.hit_rate ?? 0) * 100)}%). Review your caching strategy.`,
+    insight: repos.length === 0
+      ? 'No cache data found. Cache may not be configured or no entries exist yet.'
+      : `${repos.length} repositor${repos.length === 1 ? 'y' : 'ies'} using ${formatSize(totalGb)} cache storage.`,
   };
 }
 
@@ -128,11 +126,11 @@ export async function getCacheEntries(
     perPage: limit,
   });
 
-  const formatBytes = (bytes: number): string => {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-    return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+  // API returns size in MB
+  const formatSize = (mb: number): string => {
+    if (mb < 1) return `${(mb * 1024).toFixed(0)} KB`;
+    if (mb < 1024) return `${mb.toFixed(1)} MB`;
+    return `${(mb / 1024).toFixed(2)} GB`;
   };
 
   const formatTimeAgo = (timestamp: string | undefined): string => {
@@ -147,25 +145,25 @@ export async function getCacheEntries(
     return `${days}d ago`;
   };
 
-  const entries = response.entries ?? [];
-  const totalSize = entries.reduce((sum, e) => sum + e.size_bytes, 0);
+  // API returns {data: CacheEntry[]}
+  const entries = response.data ?? [];
+  const totalMb = entries.reduce((sum, e) => sum + e.size, 0);
 
   return {
     summary: {
       repository: args.repository,
-      total_entries: response.total_count ?? entries.length,
-      showing: entries.length,
-      total_size: formatBytes(totalSize),
+      total_entries: entries.length,
+      total_size: formatSize(totalMb),
     },
     entries: entries.map(entry => ({
       key: entry.key.length > 60 ? entry.key.substring(0, 60) + '...' : entry.key,
       scope: entry.scope,
-      size: formatBytes(entry.size_bytes),
-      architecture: entry.architecture,
-      last_hit: formatTimeAgo(entry.last_hit_time),
+      size: formatSize(entry.size),
+      architecture: entry.arch,
+      last_hit: formatTimeAgo(entry.lastHitTime),
     })),
     insight: entries.length === 0
       ? 'No cache entries found for this repository.'
-      : `${entries.length} cache entries totaling ${formatBytes(totalSize)}. Most recent hit: ${formatTimeAgo(entries[0]?.last_hit_time ?? '')}.`,
+      : `${entries.length} cache entries totaling ${formatSize(totalMb)}. Most recent hit: ${formatTimeAgo(entries[0]?.lastHitTime)}.`,
   };
 }

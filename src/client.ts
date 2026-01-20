@@ -21,7 +21,7 @@ import type {
   JobMetrics,
   TestsResponse,
   LogSearchResponse,
-  CacheStats,
+  CacheStatsResponse,
   CacheEntriesResponse,
 } from './types/blacksmith.js';
 
@@ -361,20 +361,25 @@ export class BlacksmithClient {
 
   /**
    * Get cache statistics.
+   * Returns array of repository cache summaries.
    */
-  async getCacheStats(includeHistory = false): Promise<CacheStats> {
-    return this.orgRequest<CacheStats>(
+  async getCacheStats(includeHistory = false): Promise<CacheStatsResponse> {
+    return this.orgRequest<CacheStatsResponse>(
       `metrics/cache?include_history=${includeHistory}`
     );
   }
 
   /**
    * Get detailed cache entries for a repository.
+   * Note: API expects short repo name (e.g., "votion" not "Org/votion").
    */
   async getCacheEntries(
     repository: string,
     params?: { page?: number; perPage?: number; sortBy?: string }
   ): Promise<CacheEntriesResponse> {
+    // Extract short repo name if full name provided (API only accepts short name)
+    const repoName = repository.includes('/') ? repository.split('/').pop()! : repository;
+
     const searchParams = new URLSearchParams();
     searchParams.set('page', String(params?.page ?? 1));
     searchParams.set('per_page', String(params?.perPage ?? 20));
@@ -382,7 +387,7 @@ export class BlacksmithClient {
     searchParams.set('sort_direction', 'desc');
 
     return this.orgRequest<CacheEntriesResponse>(
-      `metrics/cache/repositories/${repository}?${searchParams.toString()}`
+      `metrics/cache/repositories/${repoName}?${searchParams.toString()}`
     );
   }
 }
