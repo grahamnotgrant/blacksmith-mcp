@@ -12,7 +12,7 @@ import {
   SessionExpiredError,
 } from './utils/errors.js';
 import type {
-  Organization,
+  OrgsResponse,
   CoreUsage,
   InvoiceAmount,
   WorkflowRun,
@@ -61,6 +61,7 @@ export class BlacksmithClient {
 
   /**
    * Make an authenticated request to the Blacksmith API.
+   * Note: Cookie values from Chrome are already URL-encoded, send them raw.
    */
   private async request<T>(
     path: string,
@@ -73,8 +74,12 @@ export class BlacksmithClient {
     const response = await fetch(url, {
       ...options,
       headers: {
-        Cookie: `session=${this.sessionCookie}`,
+        // Laravel session cookie - send raw (already URL-encoded from Chrome)
+        Cookie: `blacksmith_session=${this.sessionCookie}`,
         'Content-Type': 'application/json',
+        Accept: 'application/json',
+        Origin: 'https://app.blacksmith.sh',
+        Referer: 'https://app.blacksmith.sh/',
         ...options.headers,
       },
     });
@@ -107,9 +112,10 @@ export class BlacksmithClient {
 
   /**
    * List all accessible organizations.
+   * Returns the full response including installations and metadata.
    */
-  async listOrgs(): Promise<Organization[]> {
-    return this.request<Organization[]>('');
+  async listOrgs(): Promise<OrgsResponse> {
+    return this.request<OrgsResponse>('');
   }
 
   /**
@@ -270,14 +276,24 @@ export class BlacksmithClient {
 }
 
 /**
- * Create a Blacksmith client from environment variables.
+ * Create a Blacksmith client from environment variables or Chrome.
+ * Tries env var first, then auto-extracts from Chrome if logged in.
  */
-export function createClientFromEnv(): BlacksmithClient {
-  const sessionCookie = process.env['BLACKSMITH_SESSION_COOKIE'];
+export async function createClientFromEnv(): Promise<BlacksmithClient> {
+  // Try env var first
+  let sessionCookie = process.env['BLACKSMITH_SESSION_COOKIE'];
+
+  // If no env var, try to extract from Chrome
+  if (!sessionCookie) {
+    const { getSessionCookie } = await import('./utils/cookies.js');
+    sessionCookie = await getSessionCookie();
+  }
+
   if (!sessionCookie) {
     throw new ConfigurationError(
-      'BLACKSMITH_SESSION_COOKIE environment variable is required. ' +
-        'Extract your session cookie from Chrome DevTools > Application > Cookies.'
+      'Could not find Blacksmith session. Either:\n' +
+        '1. Log into app.blacksmith.sh in Chrome, or\n' +
+        '2. Set BLACKSMITH_SESSION_COOKIE environment variable'
     );
   }
 

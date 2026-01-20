@@ -13,6 +13,13 @@ export interface Organization {
   avatar_url: string;
 }
 
+export interface OrgsResponse {
+  total_count: number;
+  installations: Organization[];
+  active_org_name: string | null;
+  is_org_admin: boolean;
+}
+
 export interface OrgStatus {
   isPersonalOrg: boolean;
   hasOnboarded: boolean;

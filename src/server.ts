@@ -26,17 +26,26 @@ export function createServer(): Server {
   );
 
   let client: BlacksmithClient | null = null;
+  let clientPromise: Promise<BlacksmithClient> | null = null;
 
   /**
    * Get or create the Blacksmith client.
-   * Lazily initialized to allow server startup without env vars for --help etc.
+   * Lazily initialized and handles async cookie extraction.
    */
-  function getClient(): BlacksmithClient {
-    if (!client) {
-      client = createClientFromEnv();
-      logger.info('Blacksmith client initialized');
+  async function getClient(): Promise<BlacksmithClient> {
+    if (client) {
+      return client;
     }
-    return client;
+
+    if (!clientPromise) {
+      clientPromise = createClientFromEnv().then((c) => {
+        client = c;
+        logger.info('Blacksmith client initialized');
+        return c;
+      });
+    }
+
+    return clientPromise;
   }
 
   // List available tools
@@ -53,7 +62,8 @@ export function createServer(): Server {
     logger.info(`Executing tool: ${name}`, args);
 
     try {
-      const result = await executeTool(getClient(), name, args ?? {});
+      const clientInstance = await getClient();
+      const result = await executeTool(clientInstance, name, args ?? {});
       return {
         content: [
           {
