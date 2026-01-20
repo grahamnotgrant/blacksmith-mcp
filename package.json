@@ -1,0 +1,62 @@
+{
+  "name": "blacksmith-mcp",
+  "version": "0.1.0",
+  "description": "MCP server for Blacksmith CI analytics",
+  "keywords": [
+    "mcp",
+    "blacksmith",
+    "ci",
+    "github-actions",
+    "claude",
+    "model-context-protocol"
+  ],
+  "license": "MIT",
+  "author": "Graham Huber",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/grahamnotgrant/blacksmith-mcp.git"
+  },
+  "bugs": {
+    "url": "https://github.com/grahamnotgrant/blacksmith-mcp/issues"
+  },
+  "homepage": "https://github.com/grahamnotgrant/blacksmith-mcp#readme",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "blacksmith-mcp": "dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "lint": "eslint src",
+    "lint:fix": "eslint src --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "zod": "^3.23.0",
+    "zod-to-json-schema": "^3.23.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.0.0",
+    "@types/node": "^22.0.0",
+    "eslint": "^9.0.0",
+    "prettier": "^3.4.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.7.0",
+    "typescript-eslint": "^8.0.0",
+    "vitest": "^2.1.0"
+  }
+}
