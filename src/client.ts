@@ -16,7 +16,7 @@ import type {
   CoreUsage,
   InvoiceAmount,
   WorkflowRun,
-  WorkflowRunsResponse,
+  RunDetailResponse,
   Job,
   JobMetrics,
   TestsResponse,
@@ -158,45 +158,64 @@ export class BlacksmithClient {
     return this.orgRequest<InvoiceAmount>('metrics/invoice-amount');
   }
 
+  /**
+   * Get usage summary (billable vs free minutes).
+   */
+  async getUsageSummary(): Promise<{ billable_minutes: number; free_minutes: number }> {
+    return this.orgRequest<{ billable_minutes: number; free_minutes: number }>('usage');
+  }
+
   // ==================== Workflow Runs ====================
 
   /**
-   * List workflow runs.
+   * Convert YYYY-MM-DD to ISO 8601 format required by Blacksmith API.
+   * If already in ISO format, returns as-is.
    */
-  async listRuns(params?: {
-    startDate?: string;
-    endDate?: string;
-    limit?: number;
-  }): Promise<WorkflowRunsResponse> {
-    const searchParams = new URLSearchParams();
-    if (params?.startDate) searchParams.set('start_date', params.startDate);
-    if (params?.endDate) searchParams.set('end_date', params.endDate);
-    if (params?.limit) searchParams.set('limit', String(params.limit));
-
-    const query = searchParams.toString();
-    const endpoint = query
-      ? `metrics/actions/workflows/runs?${query}`
-      : 'metrics/actions/workflows/runs';
-
-    return this.orgRequest<WorkflowRunsResponse>(endpoint);
+  private toISODate(date: string, endOfDay = false): string {
+    // Already ISO format
+    if (date.includes('T')) return date;
+    // Convert YYYY-MM-DD to ISO 8601
+    return endOfDay ? `${date}T23:59:59Z` : `${date}T00:00:00Z`;
   }
 
   /**
-   * Get a specific workflow run.
+   * List workflow runs.
+   * Note: API requires start_date and end_date in ISO 8601 format.
+   * Returns raw array of runs (not wrapped in {runs, total_count}).
    */
-  async getRun(runId: string): Promise<WorkflowRun> {
-    return this.orgRequest<WorkflowRun>(`metrics/actions/workflows/runs/${runId}`);
+  async listRuns(params: {
+    startDate: string;
+    endDate: string;
+    limit?: number;
+  }): Promise<WorkflowRun[]> {
+    const searchParams = new URLSearchParams();
+    searchParams.set('start_date', this.toISODate(params.startDate, false));
+    searchParams.set('end_date', this.toISODate(params.endDate, true));
+    if (params.limit) searchParams.set('limit', String(params.limit));
+
+    const endpoint = `metrics/actions/workflows/runs?${searchParams.toString()}`;
+    return this.orgRequest<WorkflowRun[]>(endpoint);
+  }
+
+  /**
+   * Get a specific workflow run with jobs.
+   * Returns full run detail including embedded jobs array.
+   */
+  async getRun(runId: string): Promise<RunDetailResponse> {
+    return this.orgRequest<RunDetailResponse>(`metrics/actions/workflows/runs/${runId}`);
   }
 
   // ==================== Jobs ====================
 
   /**
    * Get job details.
+   * Note: API returns {job: Job}, we unwrap it.
    */
   async getJob(runId: string, jobId: string): Promise<Job> {
-    return this.orgRequest<Job>(
+    const response = await this.orgRequest<{ job: Job }>(
       `metrics/actions/workflows/runs/${runId}/jobs/${jobId}`
     );
+    return response.job;
   }
 
   /**
@@ -210,20 +229,60 @@ export class BlacksmithClient {
 
   /**
    * Get job logs.
+   * Note: API returns newline-delimited JSON (streaming format).
+   * Each line can have: log, message, or line field containing the log text.
    */
   async getJobLogs(
     jobId: string,
     params?: { limit?: number; vmId?: string }
-  ): Promise<string> {
+  ): Promise<{ logs: string; rawLines: unknown[] }> {
     const searchParams = new URLSearchParams();
     searchParams.set('job_id', jobId);
     if (params?.limit) searchParams.set('limit', String(params.limit));
     if (params?.vmId) searchParams.set('vm_id', params.vmId);
 
-    const result = await this.orgRequest<{ logs: string }>(
-      `metrics/logs/job/stream?${searchParams.toString()}`
-    );
-    return result.logs;
+    const org = this.getOrg();
+    const url = `${BASE_URL}/${org}/metrics/logs/job/stream?${searchParams.toString()}`;
+
+    logger.debug(`Fetching logs from: ${url}`);
+
+    const response = await fetch(url, {
+      headers: {
+        Cookie: `blacksmith_session=${this.sessionCookie}`,
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        Origin: 'https://app.blacksmith.sh',
+        Referer: 'https://app.blacksmith.sh/',
+      },
+    });
+
+    if (!response.ok) {
+      throw new ApiError(`API request failed: ${response.status}`, response.status);
+    }
+
+    // Response is newline-delimited JSON - parse line by line
+    const text = await response.text();
+    const lines = text.trim().split('\n');
+    const logs: string[] = [];
+    const rawLines: unknown[] = [];
+
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      try {
+        const parsed = JSON.parse(line);
+        rawLines.push(parsed);
+        // Try different field names the API might use
+        const logText = parsed.log || parsed.message || parsed.line || parsed.content;
+        if (logText) {
+          logs.push(logText);
+        }
+      } catch {
+        // If not JSON, treat the line itself as a log entry
+        logs.push(line);
+      }
+    }
+
+    return { logs: logs.join('\n'), rawLines };
   }
 
   // ==================== Tests ====================

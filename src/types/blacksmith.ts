@@ -52,53 +52,109 @@ export interface UsageTimeseries {
 
 export interface InvoiceAmount {
   amount: number;
-  currency: string;
-  period_start: string;
-  period_end: string;
+  currency?: string;
+  period_start?: string;
+  period_end?: string;
 }
 
 // Workflow run types
 export interface WorkflowRun {
   id: number;
   name: string;
-  head_branch: string;
-  head_sha: string;
-  status: string;
-  conclusion: string | null;
-  workflow_id: number;
-  run_number: number;
-  event: string;
-  created_at: string;
-  updated_at: string;
-  run_started_at: string;
-  jobs_url: string;
-  repository: {
+  title?: string;
+  head_branch?: string;
+  branch_name?: string;
+  head_sha?: string;
+  head_commit?: {
+    sha: string;
+    message?: string;
+  };
+  status?: string;
+  conclusion?: string | null;
+  workflow_id?: string | number;
+  workflow_name?: string;
+  run_number?: number;
+  run_attempt?: number;
+  event?: string;
+  created_at?: string;
+  updated_at?: string;
+  run_started_at?: string;
+  duration_seconds?: number;
+  jobs_url?: string;
+  github_url?: string;
+  // Old format (some endpoints)
+  repository?: {
     full_name: string;
   };
-  actor: {
+  // New format (runs list)
+  repository_name?: string;
+  repository_url?: string;
+  actor?: {
+    id?: number;
+    type?: string;
     login: string;
-    avatar_url: string;
+    avatar_url?: string;
+    html_url?: string;
   };
+  pull_request?: {
+    number: number;
+    url: string;
+  } | null;
 }
 
-export interface WorkflowRunsResponse {
-  runs: WorkflowRun[];
-  total_count: number;
+// Run detail response (includes jobs)
+export interface RunDetailResponse {
+  run_id: string;
+  workflow_name: string;
+  repository_name: string;
+  attempts?: {
+    attempt: number;
+    id: number;
+    name: string;
+    status: string;
+    event: string;
+    created_at: string;
+    updated_at: string;
+    html_url: string;
+  }[];
+  jobs?: JobSummary[];
 }
 
-// Job types
+// Job summary (from run detail)
+export interface JobSummary {
+  id: string;
+  name: string;
+  status: string;
+  conclusion: string;
+  event_status?: string;
+  runtime_seconds?: number;
+  workflow_name?: string;
+  repository_name?: string;
+  workflow_run_id?: string;
+  workflow_run_attempt?: number;
+  labels?: string[];
+  steps?: JobStep[];
+}
+
+// Job types (full detail)
 export interface Job {
-  id: number;
-  run_id: number;
+  id: number | string;
+  run_id?: number | string;
   name: string;
   status: string;
   conclusion: string | null;
-  started_at: string | null;
-  completed_at: string | null;
-  runner_name: string | null;
-  runner_group_name: string | null;
-  labels: string[];
-  steps: JobStep[];
+  event_status?: string;
+  runtime_seconds?: number;
+  started_at?: string | null;
+  completed_at?: string | null;
+  runner_name?: string | null;
+  runner_group_name?: string | null;
+  workflow_name?: string;
+  repository_name?: string;
+  workflow_run_id?: string;
+  workflow_run_attempt?: number;
+  labels?: string[];
+  steps?: JobStep[];
 }
 
 export interface JobStep {

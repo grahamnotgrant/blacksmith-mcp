@@ -33,7 +33,7 @@ export async function getJob(
     labels: job.labels,
     started_at: job.started_at,
     completed_at: job.completed_at,
-    steps: job.steps.map((step) => ({
+    steps: job.steps?.map((step) => ({
       number: step.number,
       name: step.name,
       status: step.status,
@@ -48,16 +48,30 @@ export async function getJobLogs(
   client: BlacksmithClient,
   args: z.infer<typeof getJobLogsSchema>
 ) {
-  const logs = await client.getJobLogs(args.job_id, {
+  const result = await client.getJobLogs(args.job_id, {
     limit: args.limit ?? 1000,
     vmId: args.vm_id,
   });
 
-  // Return logs with some metadata
-  const lines = logs.split('\n');
+  const lines = result.logs.split('\n').filter((l) => l.trim());
+
+  // If logs are empty but we got raw lines, include debug info
+  if (lines.length === 0 && result.rawLines.length > 0) {
+    return {
+      job_id: args.job_id,
+      line_count: 0,
+      logs: '',
+      debug: {
+        raw_line_count: result.rawLines.length,
+        sample: result.rawLines.slice(0, 3),
+        note: 'Logs returned but format not recognized. Check debug.sample for raw data.',
+      },
+    };
+  }
+
   return {
     job_id: args.job_id,
     line_count: lines.length,
-    logs: logs,
+    logs: result.logs,
   };
 }

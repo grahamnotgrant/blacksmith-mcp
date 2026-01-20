@@ -16,8 +16,10 @@ import {
 import {
   listRunsSchema,
   getRunSchema,
+  listJobsSchema,
   listRuns,
   getRun,
+  listJobs,
 } from './runs.js';
 import {
   getJobSchema,
@@ -34,8 +36,10 @@ import {
 import {
   getCurrentUsageSchema,
   getInvoiceAmountSchema,
+  getUsageSummarySchema,
   getCurrentUsage,
   getInvoiceAmount,
+  getUsageSummary,
 } from './usage.js';
 
 /**
@@ -80,9 +84,16 @@ const tools: ToolDefinition[] = [
   {
     name: 'get_run',
     description:
-      'Get details of a specific workflow run by ID.',
+      'Get details of a specific workflow run by ID. Includes list of jobs.',
     schema: getRunSchema,
     handler: getRun,
+  },
+  {
+    name: 'list_jobs',
+    description:
+      'List all jobs for a specific workflow run. Use this to get job IDs for get_job, get_job_logs, and get_job_tests.',
+    schema: listJobsSchema,
+    handler: listJobs,
   },
 
   // Jobs
@@ -131,6 +142,13 @@ const tools: ToolDefinition[] = [
       'Get the current billing period invoice amount.',
     schema: getInvoiceAmountSchema,
     handler: getInvoiceAmount,
+  },
+  {
+    name: 'get_usage_summary',
+    description:
+      'Get usage summary showing billable minutes vs free tier allowance. Shows remaining free minutes and overage.',
+    schema: getUsageSummarySchema,
+    handler: getUsageSummary,
   },
 ];
 
