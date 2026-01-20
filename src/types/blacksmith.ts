@@ -178,7 +178,7 @@ export interface TestResult {
   job_id: string;
   test_type: string;
   test_name: string;
-  test_suite: string;
+  test_suite: string | null;  // Can be null for some test frameworks
   test_status: 'pass' | 'fail' | 'skip';
   duration_seconds: number | null;
   log_line_start: number | null;
@@ -243,4 +243,21 @@ export interface CacheStats {
     size_bytes: number;
     entries: number;
   }[];
+}
+
+export interface CacheEntry {
+  key: string;
+  version: string;
+  scope: string;
+  size_bytes: number;
+  architecture: string;
+  last_hit_time: string;
+  created_at: string;
+}
+
+export interface CacheEntriesResponse {
+  entries: CacheEntry[];
+  total_count: number;
+  page: number;
+  per_page: number;
 }
