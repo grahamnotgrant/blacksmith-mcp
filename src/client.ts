@@ -21,7 +21,8 @@ import type {
   JobMetrics,
   TestsResponse,
   LogSearchResponse,
-  CacheStats,
+  CacheStatsResponse,
+  CacheEntriesResponse,
 } from './types/blacksmith.js';
 
 const BASE_URL = 'https://backend.blacksmith.sh/api/user/github/orgs';
@@ -182,16 +183,50 @@ export class BlacksmithClient {
    * List workflow runs.
    * Note: API requires start_date and end_date in ISO 8601 format.
    * Returns raw array of runs (not wrapped in {runs, total_count}).
+   *
+   * API uses array params: statuses[], repositories[], workflows[], branches[], users[]
    */
   async listRuns(params: {
     startDate: string;
     endDate: string;
     limit?: number;
+    statuses?: string[];
+    repositories?: string[];
+    branches?: string[];
+    workflows?: string[];
+    users?: string[];
   }): Promise<WorkflowRun[]> {
     const searchParams = new URLSearchParams();
     searchParams.set('start_date', this.toISODate(params.startDate, false));
     searchParams.set('end_date', this.toISODate(params.endDate, true));
     if (params.limit) searchParams.set('limit', String(params.limit));
+
+    // API uses array params with [] suffix
+    if (params.statuses?.length) {
+      for (const status of params.statuses) {
+        searchParams.append('statuses[]', status);
+      }
+    }
+    if (params.repositories?.length) {
+      for (const repo of params.repositories) {
+        searchParams.append('repositories[]', repo);
+      }
+    }
+    if (params.branches?.length) {
+      for (const branch of params.branches) {
+        searchParams.append('branches[]', branch);
+      }
+    }
+    if (params.workflows?.length) {
+      for (const workflow of params.workflows) {
+        searchParams.append('workflows[]', workflow);
+      }
+    }
+    if (params.users?.length) {
+      for (const user of params.users) {
+        searchParams.append('users[]', user);
+      }
+    }
 
     const endpoint = `metrics/actions/workflows/runs?${searchParams.toString()}`;
     return this.orgRequest<WorkflowRun[]>(endpoint);
@@ -326,10 +361,33 @@ export class BlacksmithClient {
 
   /**
    * Get cache statistics.
+   * Returns array of repository cache summaries.
    */
-  async getCacheStats(includeHistory = false): Promise<CacheStats> {
-    return this.orgRequest<CacheStats>(
+  async getCacheStats(includeHistory = false): Promise<CacheStatsResponse> {
+    return this.orgRequest<CacheStatsResponse>(
       `metrics/cache?include_history=${includeHistory}`
+    );
+  }
+
+  /**
+   * Get detailed cache entries for a repository.
+   * Note: API expects short repo name (e.g., "votion" not "Org/votion").
+   */
+  async getCacheEntries(
+    repository: string,
+    params?: { page?: number; perPage?: number; sortBy?: string }
+  ): Promise<CacheEntriesResponse> {
+    // Extract short repo name if full name provided (API only accepts short name)
+    const repoName = repository.includes('/') ? repository.split('/').pop()! : repository;
+
+    const searchParams = new URLSearchParams();
+    searchParams.set('page', String(params?.page ?? 1));
+    searchParams.set('per_page', String(params?.perPage ?? 20));
+    searchParams.set('sort_by', params?.sortBy ?? 'lastHitTime');
+    searchParams.set('sort_direction', 'desc');
+
+    return this.orgRequest<CacheEntriesResponse>(
+      `metrics/cache/repositories/${repoName}?${searchParams.toString()}`
     );
   }
 }

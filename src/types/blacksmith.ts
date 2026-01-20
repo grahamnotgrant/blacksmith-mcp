@@ -178,7 +178,7 @@ export interface TestResult {
   job_id: string;
   test_type: string;
   test_name: string;
-  test_suite: string;
+  test_suite: string | null;  // Can be null for some test frameworks
   test_status: 'pass' | 'fail' | 'skip';
   duration_seconds: number | null;
   log_line_start: number | null;
@@ -234,13 +234,32 @@ export interface SplitGraphData {
 }
 
 // Cache types
-export interface CacheStats {
-  total_size_bytes: number;
-  total_entries: number;
-  hit_rate: number;
-  repositories: {
-    name: string;
-    size_bytes: number;
-    entries: number;
-  }[];
+// API returns array of repository cache summaries
+export interface CacheRepoSummary {
+  name: string;               // Full repo name: "Org/repo"
+  num_entries: number;
+  usage_total_gbs: number;    // Size in GB
+  usage_total_percentage: number;
+  can_delete: boolean;
+}
+
+// getCacheStats returns array directly
+export type CacheStatsResponse = CacheRepoSummary[];
+
+// Cache entry from the entries endpoint
+export interface CacheEntry {
+  key: string;
+  version: string;
+  scope: string;
+  size: number;              // Size in MB
+  arch: string;              // "amd64", "arm64"
+  lastHitTime: string;       // ISO timestamp (camelCase from API)
+  transparent_cache?: boolean;
+  transparentCache?: boolean;
+  hits?: unknown[];
+}
+
+// getCacheEntries returns {data: CacheEntry[]}
+export interface CacheEntriesResponse {
+  data: CacheEntry[];
 }
