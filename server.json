@@ -1,0 +1,36 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.grahamnotgrant/blacksmith",
+  "description": "MCP server for Blacksmith CI - query runs, analyze test failures, detect flaky tests.",
+  "repository": {
+    "url": "https://github.com/grahamnotgrant/blacksmith-mcp",
+    "source": "github"
+  },
+  "version": "0.1.1",
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "blacksmith-mcp",
+      "version": "0.1.1",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "description": "Your Blacksmith organization name",
+          "isRequired": true,
+          "format": "string",
+          "isSecret": false,
+          "name": "BLACKSMITH_ORG"
+        },
+        {
+          "description": "Session cookie (auto-extracted from Chrome if not set)",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": true,
+          "name": "BLACKSMITH_SESSION_COOKIE"
+        }
+      ]
+    }
+  ]
+}

@@ -1,6 +1,7 @@
 {
   "name": "blacksmith-mcp",
-  "version": "0.1.0",
+  "version": "0.1.1",
+  "mcpName": "io.github.grahamnotgrant/blacksmith",
   "description": "MCP server for Blacksmith CI analytics",
   "keywords": [
     "mcp",
