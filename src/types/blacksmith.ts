@@ -27,12 +27,16 @@ export interface OrgStatus {
 }
 
 export interface OrgSettings {
-  primaryEmail: string | null;
-  emailAlertThreshold: number | null;
-  maxTimeout: number | null;
-  logIngestion: {
-    enabled: boolean;
-  } | null;
+  primary_email: string | null;
+  email_alert_threshold: number | null;
+  max_timeout: unknown;
+  runner_region: string | null;
+  docker_container_caching: unknown;
+  branch_protection: unknown;
+  log_ingestion: unknown;
+  ssh: unknown;
+  github_comments: unknown;
+  user_pr_comment_settings: unknown;
 }
 
 // Usage types

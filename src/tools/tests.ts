@@ -122,8 +122,11 @@ export async function getFailedTests(
     );
   }
 
-  // Apply limit only if specified (no default limit - return all)
-  const limitedTests = args.limit ? tests.slice(0, args.limit) : tests;
+  // Apply limit (hard cap at 200 to prevent oversized responses)
+  const MAX_FAILED_TESTS = 200;
+  const effectiveLimit = args.limit ? Math.min(args.limit, MAX_FAILED_TESTS) : MAX_FAILED_TESTS;
+  const limitedTests = tests.slice(0, effectiveLimit);
+  const truncated = tests.length > effectiveLimit;
   const errorLines = Math.min(args.error_lines ?? 5, 50);
 
   // Group by test suite for easier debugging
@@ -144,6 +147,8 @@ export async function getFailedTests(
       filtered: args.suite ? tests.length : undefined,
       showing: limitedTests.length,
       suites_affected: bySuite.size,
+      truncated,
+      ...(truncated && { total_available: tests.length }),
     },
     by_suite: Array.from(bySuite.entries()).map(([suite, suiteTests]) => ({
       suite,
@@ -581,8 +586,7 @@ export async function getFlakyTests(
         total_runs: totalRuns,
         recent_results: data.runs
           .slice(-10)
-          .map(r => r.status === 'pass' ? '✓' : '✗')
-          .join(''),
+          .map(r => r.status === 'pass' ? '✓' : '✗'),
       });
     }
   }
@@ -883,7 +887,7 @@ export async function getTrends(
       const date = new Date(dp.date);
       const weekStart = new Date(date);
       weekStart.setDate(date.getDate() - date.getDay());
-      key = weekStart.toISOString().split('T')[0];
+      key = weekStart.toISOString().split('T')[0] ?? '';
     } else {
       key = dp.date;
     }

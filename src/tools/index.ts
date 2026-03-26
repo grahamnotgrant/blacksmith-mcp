@@ -10,16 +10,26 @@ import type { BlacksmithClient } from '../client.js';
 import {
   listOrgsSchema,
   getOrgStatusSchema,
+  getOrgSettingsSchema,
+  getActorsSchema,
   listOrgs,
   getOrgStatus,
+  getOrgSettings,
+  getActors,
 } from './org.js';
 import {
   listRunsSchema,
   getRunSchema,
   listJobsSchema,
+  getRunFilterOptionsSchema,
+  getRunHistogramSchema,
+  getRunTestsSchema,
   listRuns,
   getRun,
   listJobs,
+  getRunFilterOptions,
+  getRunHistogram,
+  getRunTests,
 } from './runs.js';
 import {
   getJobSchema,
@@ -49,18 +59,44 @@ import {
   getCurrentUsageSchema,
   getInvoiceAmountSchema,
   getUsageSummarySchema,
+  getCoreUsageTimeseriesSchema,
   getCacheStatsSchema,
   getCacheEntriesSchema,
   getCurrentUsage,
   getInvoiceAmount,
   getUsageSummary,
+  getCoreUsageTimeseries,
   getCacheStats,
   getCacheEntries,
 } from './usage.js';
 import {
+  getMonitorsSchema,
+  getMonitors,
+} from './monitors.js';
+import {
+  getLogFilterOptionsSchema,
+  getLogHistogramSchema,
   searchLogsSchema,
+  getLogFilterOptions,
+  getLogHistogram,
   searchLogs,
 } from './logs.js';
+import {
+  getJobsDailySchema,
+  getJobsSummarySchema,
+  getJobsByDimensionSchema,
+  getRunnerTypesSchema,
+  getActiveRepositoriesSchema,
+  getActiveBranchesSchema,
+  getJobDurationDistributionSchema,
+  getJobsDaily,
+  getJobsSummary,
+  getJobsByDimension,
+  getRunnerTypes,
+  getActiveRepositories,
+  getActiveBranches,
+  getJobDurationDistribution,
+} from './analytics.js';
 
 /**
  * Tool definition with metadata.
@@ -92,6 +128,20 @@ const tools: ToolDefinition[] = [
     schema: getOrgStatusSchema,
     handler: getOrgStatus,
   },
+  {
+    name: 'get_org_settings',
+    description:
+      'Get all organization settings: email, alerts, timeouts, feature flags (Docker caching, SSH, branch protection, log ingestion), and PR comment config.',
+    schema: getOrgSettingsSchema,
+    handler: getOrgSettings,
+  },
+  {
+    name: 'get_actors',
+    description:
+      'Get users who have triggered workflow runs. Useful for filtering runs by actor.',
+    schema: getActorsSchema,
+    handler: getActors,
+  },
 
   // Workflow Runs
   {
@@ -114,6 +164,27 @@ const tools: ToolDefinition[] = [
       'List all jobs for a specific workflow run. Use this to get job IDs for get_job, get_job_logs, and get_job_tests.',
     schema: listJobsSchema,
     handler: listJobs,
+  },
+  {
+    name: 'get_run_filter_options',
+    description:
+      'Get available filter values for workflow runs: statuses, repositories, branches, workflows, and users. Use this to discover valid filter values before calling list_runs.',
+    schema: getRunFilterOptionsSchema,
+    handler: getRunFilterOptions,
+  },
+  {
+    name: 'get_run_histogram',
+    description:
+      'Get workflow run duration distribution as a histogram. Shows how long runs typically take.',
+    schema: getRunHistogramSchema,
+    handler: getRunHistogram,
+  },
+  {
+    name: 'get_run_tests',
+    description:
+      'Get test results for an entire run (all jobs). Simpler than calling get_job_tests per job. Truncates at 500 tests.',
+    schema: getRunTestsSchema,
+    handler: getRunTests,
   },
 
   // Jobs
@@ -227,11 +298,90 @@ const tools: ToolDefinition[] = [
     handler: getCacheEntries,
   },
   {
+    name: 'get_core_usage_timeseries',
+    description:
+      'Get core usage over time. Shows how many cores are being used at each interval. Defaults to last 24 hours with 15-minute intervals.',
+    schema: getCoreUsageTimeseriesSchema,
+    handler: getCoreUsageTimeseries,
+  },
+  {
+    name: 'get_monitors',
+    description:
+      'Get alerting/monitoring rules configured for the organization. Shows active monitors and their timeline history.',
+    schema: getMonitorsSchema,
+    handler: getMonitors,
+  },
+  {
     name: 'search_logs',
     description:
       'Search logs across all jobs. Filter by query (e.g., "error", "timeout"), log level (INFO/WARN/ERROR/DEBUG), and time range. Great for finding issues across runs.',
     schema: searchLogsSchema,
     handler: searchLogs,
+  },
+  {
+    name: 'get_log_filter_options',
+    description:
+      'Get available filter values for log search (e.g., job names, log levels). Use before search_logs to discover valid filter values.',
+    schema: getLogFilterOptionsSchema,
+    handler: getLogFilterOptions,
+  },
+  {
+    name: 'get_log_histogram',
+    description:
+      'Get log volume over time as a histogram. Useful for spotting error spikes or unusual activity patterns.',
+    schema: getLogHistogramSchema,
+    handler: getLogHistogram,
+  },
+
+  // Analytics
+  {
+    name: 'get_jobs_daily',
+    description:
+      'Get daily job metrics: counts, durations, and failure rates per day. Great for spotting trends. Defaults to last 7 days.',
+    schema: getJobsDailySchema,
+    handler: getJobsDaily,
+  },
+  {
+    name: 'get_jobs_summary',
+    description:
+      'Get aggregate job statistics for a period: total jobs, total duration, average duration, failure rate. The big picture view.',
+    schema: getJobsSummarySchema,
+    handler: getJobsSummary,
+  },
+  {
+    name: 'get_jobs_by_dimension',
+    description:
+      'Break down job metrics by dimension: repository, workflow, branch, or runner_type. Shows which repos/workflows consume the most CI time. Example: get_jobs_by_dimension(dimension="repository", metric="duration")',
+    schema: getJobsByDimensionSchema,
+    handler: getJobsByDimension,
+  },
+  {
+    name: 'get_runner_types',
+    description:
+      'Get runner types used for CI jobs in a period. Shows what machine types are being used.',
+    schema: getRunnerTypesSchema,
+    handler: getRunnerTypes,
+  },
+  {
+    name: 'get_active_repositories',
+    description:
+      'Get repositories with CI activity in a period. Shows which repos are actively running workflows.',
+    schema: getActiveRepositoriesSchema,
+    handler: getActiveRepositories,
+  },
+  {
+    name: 'get_active_branches',
+    description:
+      'Get branches with CI activity. Optionally filter by repository.',
+    schema: getActiveBranchesSchema,
+    handler: getActiveBranches,
+  },
+  {
+    name: 'get_job_duration_distribution',
+    description:
+      'Get job duration distribution with percentile breakdowns (P50/P90/P95/P99/Max). Shows histogram of how long jobs take and identifies outliers.',
+    schema: getJobDurationDistributionSchema,
+    handler: getJobDurationDistribution,
   },
 ];
 

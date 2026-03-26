@@ -4,6 +4,7 @@
 
 import { z } from 'zod';
 import type { BlacksmithClient } from '../client.js';
+import { getDefaultDateRange } from '../utils/dates.js';
 
 export const listRunsSchema = z.object({
   start_date: z.string().optional().describe('Start date (YYYY-MM-DD)'),
@@ -27,17 +28,18 @@ export const listJobsSchema = z.object({
   run_id: z.string().describe('GitHub Actions workflow run ID'),
 });
 
-/**
- * Get default date range (last 7 days).
- */
-function getDefaultDateRange(): { startDate: string; endDate: string } {
-  const now = new Date();
-  const endDate = now.toISOString().split('T')[0];
-  const startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
-    .toISOString()
-    .split('T')[0];
-  return { startDate, endDate };
-}
+export const getRunFilterOptionsSchema = z.object({});
+
+export const getRunHistogramSchema = z.object({
+  start_date: z.string().optional().describe('Start date (YYYY-MM-DD). Defaults to 7 days ago.'),
+  end_date: z.string().optional().describe('End date (YYYY-MM-DD). Defaults to today.'),
+  bucket_count: z.number().optional().describe('Number of histogram buckets. Defaults to 12.'),
+});
+
+export const getRunTestsSchema = z.object({
+  run_id: z.string().describe('GitHub Actions workflow run ID'),
+});
+
 
 export async function listRuns(
   client: BlacksmithClient,
@@ -156,5 +158,58 @@ export async function listJobs(
       })),
     })) ?? [],
     total_count: run.jobs?.length ?? 0,
+  };
+}
+
+export async function getRunFilterOptions(client: BlacksmithClient) {
+  const data = await client.getRunFilterOptions();
+
+  return {
+    filters: data,
+    insight: 'Available filter values for list_runs (statuses, repositories, branches, workflows, users).',
+  };
+}
+
+export async function getRunHistogram(
+  client: BlacksmithClient,
+  args: z.infer<typeof getRunHistogramSchema>
+) {
+  const defaults = getDefaultDateRange();
+  const startDate = args.start_date ?? defaults.startDate;
+  const endDate = args.end_date ?? defaults.endDate;
+
+  const data = await client.getRunHistogram(startDate, endDate, args.bucket_count ?? 12);
+
+  return {
+    date_range: { start: startDate, end: endDate },
+    histogram: data,
+    insight: 'Workflow run duration distribution.',
+  };
+}
+
+const MAX_RUN_TESTS = 500;
+
+export async function getRunTests(
+  client: BlacksmithClient,
+  args: z.infer<typeof getRunTestsSchema>
+) {
+  const response = await client.getRunTests(args.run_id);
+  const tests = response.tests ?? [];
+  const truncated = tests.length > MAX_RUN_TESTS;
+
+  return {
+    run_id: args.run_id,
+    summary: {
+      total: response.total_count ?? tests.length,
+      passed: tests.filter((t) => t.test_status === 'pass').length,
+      failed: tests.filter((t) => t.test_status === 'fail').length,
+      skipped: tests.filter((t) => t.test_status === 'skip').length,
+    },
+    tests: truncated ? tests.slice(0, MAX_RUN_TESTS) : tests,
+    truncated,
+    ...(truncated && { total_available: tests.length }),
+    insight: truncated
+      ? `Showing ${MAX_RUN_TESTS} of ${tests.length} tests. Use get_job_tests for specific jobs.`
+      : `${tests.length} tests for this run.`,
   };
 }

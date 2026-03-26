@@ -110,7 +110,7 @@ function decryptCookieValue(encryptedValue: Buffer, key: Buffer): string | null 
     }
 
     // If first bytes look like garbage (non-printable), skip the 32-byte MAC
-    if (decrypted.length > 32 && decrypted[0] > 127) {
+    if (decrypted.length > 32 && (decrypted[0] ?? 0) > 127) {
       const withoutMac = decrypted.slice(32).toString('utf-8');
       if (withoutMac.length > 0 && withoutMac.charCodeAt(0) < 127) {
         return withoutMac;

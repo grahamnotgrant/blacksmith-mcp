@@ -11,6 +11,11 @@ export const getInvoiceAmountSchema = z.object({});
 
 export const getUsageSummarySchema = z.object({});
 
+export const getCoreUsageTimeseriesSchema = z.object({
+  window_size: z.number().optional().describe('Data point interval in minutes (default: 15).'),
+  hours: z.number().optional().describe('Number of hours to look back (default: 24).'),
+});
+
 export const getCacheStatsSchema = z.object({
   include_history: z
     .boolean()
@@ -74,6 +79,28 @@ export async function getUsageSummary(client: BlacksmithClient) {
     overage_minutes: overageMinutes,
     usage_percent: Math.round((usedMinutes / freeMinutes) * 100),
     status: usedMinutes >= freeMinutes ? 'over_limit' : 'within_free_tier',
+  };
+}
+
+export async function getCoreUsageTimeseries(
+  client: BlacksmithClient,
+  args: z.infer<typeof getCoreUsageTimeseriesSchema>
+) {
+  const hours = args.hours ?? 24;
+  const endDate = new Date().toISOString();
+  const startDate = new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
+
+  const data = await client.getCoreUsageTimeseries({
+    windowSize: args.window_size ?? 15,
+    startDate,
+    endDate,
+  });
+
+  return {
+    time_range: { start: startDate, end: endDate },
+    window_size_minutes: args.window_size ?? 15,
+    data,
+    insight: `Core usage timeseries for the last ${hours} hours.`,
   };
 }
 

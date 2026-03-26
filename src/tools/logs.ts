@@ -5,6 +5,24 @@
 import { z } from 'zod';
 import type { BlacksmithClient } from '../client.js';
 
+export const getLogFilterOptionsSchema = z.object({
+  property: z
+    .enum(['job_names', 'levels'])
+    .describe('Property to get filter options for (e.g., "job_names" to see available job names).'),
+  hours: z
+    .number()
+    .optional()
+    .describe('Number of hours to search back (default: 1, max: 24)'),
+});
+
+export const getLogHistogramSchema = z.object({
+  query: z.string().optional().describe('Search query to filter logs.'),
+  hours: z
+    .number()
+    .optional()
+    .describe('Number of hours to search back (default: 1, max: 24)'),
+});
+
 export const searchLogsSchema = z.object({
   query: z
     .string()
@@ -74,5 +92,49 @@ export async function searchLogs(
     insight: levelCounts.get('ERROR')
       ? `Found ${levelCounts.get('ERROR')} error(s) in the last ${hours} hour(s).`
       : `No errors found in the last ${hours} hour(s).`,
+  };
+}
+
+export async function getLogFilterOptions(
+  client: BlacksmithClient,
+  args: z.infer<typeof getLogFilterOptionsSchema>
+) {
+  const hours = Math.min(args.hours ?? 1, 24);
+  const endTime = new Date().toISOString();
+  const startTime = new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
+
+  const data = await client.getLogFilterOptions({
+    startTime,
+    endTime,
+    property: args.property,
+  });
+
+  return {
+    property: args.property,
+    time_range: { start: startTime, end: endTime },
+    options: data,
+    insight: `Available ${args.property} values for log filtering in the last ${hours} hour(s).`,
+  };
+}
+
+export async function getLogHistogram(
+  client: BlacksmithClient,
+  args: z.infer<typeof getLogHistogramSchema>
+) {
+  const hours = Math.min(args.hours ?? 1, 24);
+  const endTime = new Date().toISOString();
+  const startTime = new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
+
+  const data = await client.getLogHistogram({
+    startTime,
+    endTime,
+    query: args.query,
+  });
+
+  return {
+    time_range: { start: startTime, end: endTime },
+    query: args.query ?? '',
+    histogram: data,
+    insight: `Log volume over the last ${hours} hour(s)${args.query ? ` matching "${args.query}"` : ''}.`,
   };
 }
