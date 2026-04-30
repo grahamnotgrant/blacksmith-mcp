@@ -51,7 +51,9 @@ export async function getInvoiceAmount(client: BlacksmithClient) {
   const invoice = await client.getInvoiceAmount();
 
   const currency = invoice.currency || 'USD';
-  const amountDollars = (invoice.amount / 100).toFixed(2);
+  // Blacksmith's invoice-amount endpoint returns the amount as a decimal in
+  // dollars (e.g. 288.17 = $288.17). It is NOT cents.
+  const amountDollars = invoice.amount.toFixed(2);
 
   return {
     amount: invoice.amount,
